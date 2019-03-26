@@ -74,6 +74,8 @@ void clear_queue (Queue* queue) {
 	current = queue->head;
 	while (current != NULL) {
 		next = current->next;
+		free(current->p->process_ID);
+		free(current->p);
 		free(current);
 		current = next;
 	}
@@ -135,9 +137,12 @@ void rotate_queue_left (Queue* queue) {
 	}
 }
 //END QUEUE STRUCT AND LOGIC
-
-void read_file()
+Queue* future_proc;
+Queue* round_robin;
+void read_file(void)
 {
+	future_proc = create_queue();
+
 	int i,i2;
 	FILE* file = fopen("input.txt", "r");
     char line[90];
@@ -159,23 +164,33 @@ void read_file()
         while(line[i]!=' '&&i<90){arrival_time[i-i2]=line[i];i++;}
         if(i>90)break;
         arrival_time[i]=0;
-        printf("name: %s, service_time: %d, arrival_time: %d\n",name,atoi(service_time), atoi(arrival_time));
+        // printf("name: %s, service_time: %d, arrival_time: %d\n",name,atoi(service_time), atoi(arrival_time));
 
         /* add your code here, you are to create the upcoming processes queue here.
            essentially create a node for each process and chain them in a queue.
            note this queue is *not* the process queue used for round robin scheduling
         */
-
-
-
+		struct process* process;
+		process = malloc(sizeof(struct process));
+		process->process_ID=malloc(sizeof(50));
+		strcpy(process->process_ID, name);
+		process->arrival_time = atoi(arrival_time);
+		process->service_time = atoi(service_time);
+		process->io = 0;
+		struct node* to_add = create_node(process);
+		add_last_queue(future_proc, to_add);
     }
+	// printf("\n\n\nBUILT QUEUE AFTER FILE READ:\n");
+	// print_queue(future_proc);
+
     fclose(file);
+
     return;
 
 }
 
 //this function call simulates one millisecond of time on the computer
-void run_one_step()
+void run_one_step(void)
 {
 	int i;
 	computer.time++;
@@ -204,7 +219,7 @@ void run_one_step()
 }
 
 
-void run_one_step_p3()
+void run_one_step_p3(void)
 {
 	int rndm,i;
 	computer.time++;
@@ -306,7 +321,7 @@ void remove_proc(int core_id)
 // a demo running 4 processes until they're finished. The scheduling is done explicitly, not using
 // a scheduling algorithm. This is just to demonstrate how processes will be scheduled. In main()
 // you need to write a generic scheduling algorithm for arbitrary number of processes.
-void demo()
+void demo(void)
 {
 	int i;
 	struct process *p0,*p1,*p2,*p3;
@@ -382,22 +397,24 @@ void demo()
 	printf("DONE\n");
 }
 
-void init()
+void init(void)
 {
 	quantum=20;
 	head=tail=NULL;
 }
 
-int main()
+int main(void)
 {
-	init();
-	printf("\t*******Starting Demo*******\n");
-	demo();
-	printf("\t*******Reading Input*******\n");
-
-	printf("Start file read:\n");
+	// init();
+	// printf("\t*******Starting Demo*******\n");
+	// demo();
+	// printf("\t*******Reading Input*******\n");
+	//
+	// printf("Start file read:\n");
 	read_file();
-	printf("End file read.\n");
+	printf("\nBuilt Queue After File Read:\n");
+	print_queue(future_proc);
+	// printf("End file read.\n");
 
 	/* your code goes here for part2. In part 2, you create one node for each process, and put them on an
 	 * 'upcoming process' queue first. Then your code calls run_one_step(), for each process whose arrival time
@@ -423,6 +440,5 @@ int main()
 
 
 
-	printf("\t*******Done*******\n");
 	return 0;
 }
