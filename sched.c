@@ -2,6 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+
+// struct to store process information
+struct process
+{
+char * process_ID;
+int arrival_time;   // when this process arrives (e.g., being created)
+int service_time;  // the amount of time this process needs to run on a core to finish
+int io; // boolean io vlaue (C does not have bool value (c89/90), so use int to demonstrate boolean).
+};
+
 struct core{
 struct process* p; // pointer to the process currently running on this core
 int proc_time; // cumulative time this process has been running on the core.
@@ -13,15 +24,6 @@ struct computer
 {
 	struct core cores[4]; //this computer has 4 cores
 	long time;   // computer time in millisecond
-};
-
-// struct to store process information
-struct process
-{
-char * process_ID;
-int arrival_time;   // when this process arrives (e.g., being created)
-int service_time;  // the amount of time this process needs to run on a core to finish
-int io; // boolean io vlaue (C does not have bool value (c89/90), so use int to demonstrate boolean).
 };
 
 // one link in a queue that the scheduler uses to chain process structs,
@@ -51,7 +53,7 @@ struct Queue {
 };
 
 struct node* create_node(struct process* p) {
-	struct node* node = malloc(sizeof(node));
+	struct node* node = malloc(sizeof(struct node));
 	if (node) {
 		node->p = p;
 		node->next = NULL;
@@ -141,8 +143,6 @@ Queue* future_proc;
 Queue* round_robin;
 void read_file(void)
 {
-	future_proc = create_queue();
-
 	int i,i2;
 	FILE* file = fopen("input.txt", "r");
     char line[90];
@@ -151,7 +151,6 @@ void read_file(void)
     char arrival_time[3];
     fgets(line, sizeof(line), file);
     while (fgets(line, sizeof(line), file)) {
-        //printf("%s", line);
         i=0;
         while(line[i]!=' '&&i<90){name[i]=line[i];i++;}
         if(i>90)break;
@@ -164,29 +163,23 @@ void read_file(void)
         while(line[i]!=' '&&i<90){arrival_time[i-i2]=line[i];i++;}
         if(i>90)break;
         arrival_time[i]=0;
-        // printf("name: %s, service_time: %d, arrival_time: %d\n",name,atoi(service_time), atoi(arrival_time));
-
         /* add your code here, you are to create the upcoming processes queue here.
            essentially create a node for each process and chain them in a queue.
            note this queue is *not* the process queue used for round robin scheduling
         */
-		struct process* process;
-		process = malloc(sizeof(struct process));
-		process->process_ID=malloc(sizeof(50));
-		strcpy(process->process_ID, name);
-		process->arrival_time = atoi(arrival_time);
-		process->service_time = atoi(service_time);
-		process->io = 0;
-		struct node* to_add = create_node(process);
-		add_last_queue(future_proc, to_add);
+				//BUILD FUTURE PROCESS QUEUE
+				struct process* process;
+				process = malloc(sizeof(struct process));
+				process->process_ID=malloc(sizeof(50));
+				strcpy(process->process_ID, name);
+				process->arrival_time = atoi(arrival_time);
+				process->service_time = atoi(service_time);
+				process->io = 0;
+				struct node* to_add = create_node(process);
+				add_last_queue(future_proc, to_add);
     }
-	// printf("\n\n\nBUILT QUEUE AFTER FILE READ:\n");
-	// print_queue(future_proc);
-
     fclose(file);
-
     return;
-
 }
 
 //this function call simulates one millisecond of time on the computer
@@ -257,7 +250,7 @@ void run_one_step_p3(void)
 
 //NOTE: you must free struct node after taking a link off the round robin queue, and scheduling the respective
 // process to run on the core. Make sure you free the struct node to avoid memory leak.
-void sched_proc(struct process*p,int core_id)
+void sched_proc(struct process* p,int core_id)
 {
 	if(computer.cores[core_id].busy==0)
 	{
@@ -265,7 +258,6 @@ void sched_proc(struct process*p,int core_id)
 		computer.cores[core_id].busy=1;
 		computer.cores[core_id].p=p;
 		computer.cores[core_id].proc_time=0;
-		proc_num --; // xx added accounting of #proc
 	}
 	else printf("ERROR: must call remove_proc to remove current process before adding another to the core.\n");
 }
@@ -292,71 +284,82 @@ void remove_proc(int core_id)
 	{
 		computer.cores[core_id].proc_time=0;
 		// reinsert back to the queue
-		if(tail==NULL)
+		if(round_robin->tail==NULL)
 		{
 			// in case queue is empty, i.e. all nodes struct were freed and there are no processes in the queue, this will become the first one
-			tail=head=malloc(sizeof(struct node));
-			head->p=computer.cores[core_id].p;
-			head->next=NULL;
-			proc_num++;
+			// round_robin->tail=round_robin->head=malloc(sizeof(struct node));
+			// round_robin->head->p=computer.cores[core_id].p;
+			// round_robin->head->next=NULL;
+			// round_robin->process_num++;
+			add_last_queue(round_robin, create_node(computer.cores[core_id].p));
 			computer.cores[core_id].busy=0;
 		}
 		else
 		{
 
-			tail->next = malloc(sizeof(struct node));
-			tail=tail->next;
-			tail->p=computer.cores[core_id].p;
-			tail->next=NULL;
-			proc_num++;
+			// round_robin->tail->next = malloc(sizeof(struct node));
+			// round_robin->tail=tail->next;
+			// round_robin->tail->p=computer.cores[core_id].p;
+			// round_robin->tail->next=NULL;
+			// round_robin->process_num++;
+			add_last_queue(round_robin, create_node(computer.cores[core_id].p));
 			computer.cores[core_id].busy=0;
-
-
 		}
-
 	}
-
 }
 
 // a demo running 4 processes until they're finished. The scheduling is done explicitly, not using
 // a scheduling algorithm. This is just to demonstrate how processes will be scheduled. In main()
 // you need to write a generic scheduling algorithm for arbitrary number of processes.
-void demo(void)
-{
-	int i;
-	struct process *p0,*p1,*p2,*p3;
-	p0=malloc(sizeof(struct process));
-	p1=malloc(sizeof(struct process));
-	p2=malloc(sizeof(struct process));
-	p3=malloc(sizeof(struct process));
-
-	p0->process_ID=malloc(sizeof(50));//you can assume process ID will never exceed 50 characters
-	p1->process_ID=malloc(sizeof(50));
-	p2->process_ID=malloc(sizeof(50));
-	p3->process_ID=malloc(sizeof(50));
-
-	strcpy(p0->process_ID,"first");
-	strcpy(p1->process_ID,"Second");
-	strcpy(p2->process_ID,"Third");
-	strcpy(p3->process_ID,"Fourth");
-
-	//assign arrival time
-	p0->arrival_time=0;
-	p1->arrival_time=0;
-	p2->arrival_time=0;
-	p3->arrival_time=0;
-
-	//assign service time
-	p0->service_time=16;
-	p1->service_time=17;
-	p2->service_time=19;
-	p3->service_time=21;
-
-	p0->io = 0;
-	p1->io = 0;
-	p2->io = 0;
-	p3->io = 0;
-
+// void demo(void)
+// {
+// 	int i;
+// 	struct process *p0,*p1,*p2,*p3;
+// 	p0=malloc(sizeof(struct process));
+// 	p1=malloc(sizeof(struct process));
+// 	p2=malloc(sizeof(struct process));
+// 	p3=malloc(sizeof(struct process));
+//
+// 	p0->process_ID=malloc(sizeof(50));//you can assume process ID will never exceed 50 characters
+// 	p1->process_ID=malloc(sizeof(50));
+// 	p2->process_ID=malloc(sizeof(50));
+// 	p3->process_ID=malloc(sizeof(50));
+//
+// 	strcpy(p0->process_ID,"first");
+// 	strcpy(p1->process_ID,"Second");
+// 	strcpy(p2->process_ID,"Third");
+// 	strcpy(p3->process_ID,"Fourth");
+//
+// 	//assign arrival time
+// 	p0->arrival_time=0;
+// 	p1->arrival_time=0;
+// 	p2->arrival_time=0;
+// 	p3->arrival_time=0;
+//
+// 	//assign service time
+// 	p0->service_time=16;
+// 	p1->service_time=17;
+// 	p2->service_time=19;
+// 	p3->service_time=21;
+//
+// 	p0->io = 0;
+// 	p1->io = 0;
+// 	p2->io = 0;
+// 	p3->io = 0;
+//
+// 	Queue* queue = create_queue();
+// 	add_last_queue(queue, create_node(p0));
+// 	add_last_queue(queue, create_node(p1));
+// 	add_last_queue(queue, create_node(p2));
+// 	add_last_queue(queue, create_node(p3));
+// 	printf("\nDemo queue:\n");
+// 	print_queue(queue);
+//
+// 	remove_first_queue(queue);
+// 	remove_first_queue(queue);
+// 	remove_first_queue(queue);
+// 	printf("After removing:");
+// 	print_queue(queue);
 
 	// we will skip queue construction here because it's just 4 processes.
 	// you must use the round robin queue for the scheduling algorithm for generic cases where many processes
@@ -366,54 +369,63 @@ void demo(void)
 	// xx 4 processes are waiting to be scheduled. No queue is built in demo for simplicity.
 	// in your generic algorithm, you should create actual queues, and proc_num should be the number of processes whose
 	// arrival time has come, and are waiting in the round robin queue to be scheduled.
-	proc_num=4;
-
-
-	//schedule process to each core
-	sched_proc(p0,0);
-	sched_proc(p1,1);
-	sched_proc(p2,2);
-	sched_proc(p3,3);
-
-	for(i=0;i<16;i++)run_one_step();
-	remove_proc(0);
-	run_one_step();
-	remove_proc(1);
-	run_one_step();
-	run_one_step();
-	remove_proc(2);
-	run_one_step();
-	remove_proc(3);
-	sched_proc(head->p,0);
-
-	//NOTE: you must free struct node after scheduling the process. The demo code is not doing it here
-	// for simplification, but you have to do it in your code or you will have memory leakage
-
-	//head==tail since it was the only one added now to remove it we just make pointer pointing to NULL
-	head=NULL;
-	tail=NULL;
-	run_one_step();
-	remove_proc(0);
-	printf("DONE\n");
-}
+// 	proc_num=4;
+//
+//
+// 	//schedule process to each core
+// 	sched_proc(p0,0);
+// 	sched_proc(p1,1);
+// 	sched_proc(p2,2);
+// 	sched_proc(p3,3);
+//
+// 	for(i=0;i<16;i++)run_one_step();
+// 	remove_proc(0);
+// 	run_one_step();
+// 	remove_proc(1);
+// 	run_one_step();
+// 	run_one_step();
+// 	remove_proc(2);
+// 	run_one_step();
+// 	remove_proc(3);
+// 	sched_proc(head->p,0);
+//
+// 	//NOTE: you must free struct node after scheduling the process. The demo code is not doing it here
+// 	// for simplification, but you have to do it in your code or you will have memory leakage
+//
+// 	//head==tail since it was the only one added now to remove it we just make pointer pointing to NULL
+// 	head=NULL;
+// 	tail=NULL;
+// 	run_one_step();
+// 	remove_proc(0);
+// 	printf("DONE\n");
+// }
 
 void init(void)
 {
 	quantum=20;
-	head=tail=NULL;
+	future_proc = create_queue();
+	round_robin = create_queue();
+	computer.time = 0;
+	// head=tail=NULL;
+}
+
+int core_busy () {
+	for (int i = 0; i < 4; i++) {
+		if (computer.cores[i].busy == 1) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 int main(void)
 {
-	// init();
+	init();
 	// printf("\t*******Starting Demo*******\n");
-	// demo();
+  // demo();
 	// printf("\t*******Reading Input*******\n");
 	//
 	// printf("Start file read:\n");
-	read_file();
-	printf("\nBuilt Queue After File Read:\n");
-	print_queue(future_proc);
 	// printf("End file read.\n");
 
 	/* your code goes here for part2. In part 2, you create one node for each process, and put them on an
@@ -424,21 +436,79 @@ int main(void)
 	 * Repeat run_one_step() until all processes finish. Please handle memory allocation/deallocation properly so there's no leak
 	 */
 
-
-
-
-
-
-
+		read_file();
+	 	printf("\nBuilt Queue After File Read:\n");
+	 	print_queue(future_proc);
+	 	printf("\nProcess Num: %d\n", future_proc->process_num);
+	 	while (future_proc->process_num > 0 || round_robin->process_num > 0 || core_busy() == 1) {
+			 while (future_proc->head && computer.time == future_proc->head->p->arrival_time) {
+				 struct node* to_add = create_node(remove_first_queue(future_proc));
+				 add_last_queue(round_robin, to_add);
+				 printf("Process %s with arrival time %d and service time %d added at time %ld, %p\n", round_robin->tail->p->process_ID, round_robin->tail->p->arrival_time, round_robin->tail->p->service_time, computer.time, round_robin);
+			 }
+			 for (int i = 0; i < 4; i++) {
+				 if (computer.cores[i].busy == 1) {
+					 printf("\ncore %d busy\n", i);
+					 printf("core %d process time: %d\n", i, computer.cores[i].proc_time);
+					 //thead process time exceeded quantum or is finished
+					 if (computer.cores[i].proc_time >= quantum || computer.cores[i].p->service_time == 0) {
+						 remove_proc(i);
+					 }
+				 }
+				 if (round_robin->head) {
+					 // printf("i = %i, round_robin->head, tail: %p, %p\n", i, round_robin->head, round_robin->tail);
+					 if (computer.cores[i].busy == 0) { //the core is not busy
+						 struct process* to_sched = remove_first_queue(round_robin);
+						 sched_proc(to_sched, i);
+					 }
+				 }
+			 }
+			 run_one_step();
+		}
+		delete_queue(round_robin);
+		delete_queue(future_proc);
+		init();
 	/* After part 2 is done, you clean up everything, e.g., freeing up all memory allocated,
 	 * reset queues to empty etc.
 	 * Then restart for part 3: read input file for all processes, initialize queues,
 	 *  run processes using run_one_step_p3() so random i/o event can happen at each step on each core,
 	 *  until all processes finish. Remember to clean up again at the end!
 	 */
+	 printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 
-
-
+	 read_file();
+	 printf("\nBuilt Queue After File Read:\n");
+	 print_queue(future_proc);
+	 printf("\nProcess Num: %d\n", future_proc->process_num);
+	 while (future_proc->process_num > 0 || round_robin->process_num > 0 || core_busy() == 1) {
+			while (future_proc->head && computer.time == future_proc->head->p->arrival_time) {
+				struct node* to_add = create_node(remove_first_queue(future_proc));
+				add_last_queue(round_robin, to_add);
+				printf("Process %s with arrival time %d and service time %d added at time %ld, %p\n", round_robin->tail->p->process_ID, round_robin->tail->p->arrival_time, round_robin->tail->p->service_time, computer.time, round_robin);
+			}
+			for (int i = 0; i < 4; i++) {
+				if (computer.cores[i].busy == 1) {
+					printf("\ncore %d busy\n", i);
+					printf("core %d process time: %d\n", i, computer.cores[i].proc_time);
+					//thead process time exceeded quantum or is finished
+					if (computer.cores[i].proc_time >= quantum || computer.cores[i].p->service_time == 0 || computer.cores[i].p->io == 1) {
+						if (computer.cores[i].p->io == 1) {
+							computer.cores[i].p->io = 0;
+						}
+						remove_proc(i);
+					}
+				}
+				if (round_robin->head) {
+					if (computer.cores[i].busy == 0) { //the core is not busy
+						struct process* to_sched = remove_first_queue(round_robin);
+						sched_proc(to_sched, i);
+					}
+				}
+			}
+			run_one_step_p3();
+	 }
+	delete_queue(round_robin);
+	delete_queue(future_proc);
 
 	return 0;
 }
